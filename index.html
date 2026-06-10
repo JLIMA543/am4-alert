@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AM4 Alert">
+<meta name="description" content="AM4 fuel & CO2 price monitor">
+
+<title>AM4 Fuel Alert</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0e1a;
+    --bg2:       #0f1525;
+    --bg3:       #161e30;
+    --border:    #1e2d4a;
+    --blue:      #1e6efa;
+    --blue-dim:  #1a4eaa;
+    --green:     #00d68f;
+    --green-dim: rgba(0,214,143,0.15);
+    --red:       #ff4d6a;
+    --red-dim:   rgba(255,77,106,0.15);
+    --amber:     #ffb020;
+    --text:      #e8edf8;
+    --text2:     #8896b0;
+    --text3:     #506080;
+    --mono:      'Space Mono', monospace;
+    --sans:      'Space Grotesk', sans-serif;
+    --safe-top:  env(safe-area-inset-top, 0px);
+    --safe-bot:  env(safe-area-inset-bottom, 0px);
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-top: max(var(--safe-top), 16px);
+    padding-bottom: max(var(--safe-bot), 16px);
+    padding-left: 16px;
+    padding-right: 16px;
+    max-width: 420px;
+    margin: 0 auto;
+    gap: 14px;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+  }
+  .header-brand { display: flex; align-items: center; gap: 10px; }
+  .logo {
+    width: 36px; height: 36px;
+    background: var(--bg3);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .brand-text { line-height: 1.1; }
+  .brand-title { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; color: var(--text); }
+  .brand-sub   { font-size: 11px; color: var(--text3); }
+
+  .clock {
+    font-family: var(--mono); font-size: 11px; color: var(--text3);
+    text-align: right; line-height: 1.5;
+  }
+  .clock span { color: var(--text2); display: block; }
+
+  /* ── Status banner ── */
+  .status-banner {
+    border-radius: 12px; padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 500;
+    transition: all 0.4s ease; border: 1px solid transparent;
+  }
+  .status-banner.loading { background: var(--bg3); border-color: var(--border); color: var(--text2); }
+  .status-banner.cheap   { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .status-banner.normal  { background: var(--bg3); border-color: var(--border); color: var(--text2); }
+  .status-banner.error   { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: currentColor; }
+  .status-banner.loading .status-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+  @keyframes pulse-dot {
+    0%,100% { opacity: 0.3; transform: scale(0.8); }
+    50%      { opacity: 1;   transform: scale(1.2); }
+  }
+
+  /* ── Price cards ── */
+  .price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .price-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 18px 16px 16px;
+    display: flex; flex-direction: column; gap: 6px;
+    transition: border-color 0.4s; position: relative; overflow: hidden;
+  }
+  .price-card::before {
+    content: ''; position: absolute; inset: 0;
+    border-radius: inherit; opacity: 0; transition: opacity 0.4s;
+  }
+  .price-card.cheap     { border-color: var(--green); }
+  .price-card.cheap::before { background: var(--green-dim); opacity: 1; }
+  .price-card.expensive { border-color: var(--red); }
+  .price-card.expensive::before { background: var(--red-dim); opacity: 1; }
+
+  .card-icon  { font-size: 22px; line-height: 1; position: relative; }
+  .card-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text3); position: relative;
+  }
+  .card-value {
+    font-family: var(--mono); font-size: 30px; font-weight: 700;
+    line-height: 1; color: var(--text); position: relative; transition: color 0.4s;
+  }
+  .price-card.cheap     .card-value { color: var(--green); }
+  .price-card.expensive .card-value { color: var(--red); }
+  .card-value.placeholder { color: var(--text3); font-size: 24px; }
+
+  .card-badge {
+    font-size: 10px; font-weight: 600; padding: 2px 7px;
+    border-radius: 20px; display: inline-flex; align-items: center;
+    gap: 3px; width: fit-content; position: relative; margin-top: 2px;
+  }
+  .badge-cheap     { background: rgba(0,214,143,0.15); color: var(--green); }
+  .badge-normal    { background: rgba(255,176,32,0.15); color: var(--amber); }
+  .badge-expensive { background: var(--red-dim); color: var(--red); }
+  .badge-wait      { background: var(--bg3); color: var(--text3); }
+
+  .card-threshold { font-size: 10px; color: var(--text3); position: relative; }
+
+  /* ── Countdown ── */
+  .countdown-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 14px 18px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .countdown-label {
+    font-size: 11px; color: var(--text3); font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .countdown-timer {
+    font-family: var(--mono); font-size: 22px; font-weight: 700;
+    color: var(--blue); letter-spacing: 0.04em;
+  }
+  .countdown-bar-wrap { height: 3px; background: var(--border); border-radius: 99px; margin-top: 6px; overflow: hidden; }
+  .countdown-bar {
+    height: 100%; background: var(--blue); border-radius: 99px;
+    transition: width 1s linear, background 0.4s;
+  }
+  .countdown-bar.urgent { background: var(--red); }
+
+  /* ── Settings ── */
+  .section-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text3); padding: 0 2px;
+  }
+  .settings-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--border); gap: 12px;
+  }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-info { flex: 1; }
+  .settings-label { font-size: 13px; font-weight: 500; color: var(--text); }
+  .settings-desc  { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  .threshold-input {
+    display: flex; align-items: center; gap: 4px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 4px 10px;
+    font-family: var(--mono); font-size: 14px; color: var(--text); width: 80px;
+  }
+  .threshold-input span { color: var(--text3); font-size: 12px; }
+  .threshold-input input {
+    background: none; border: none; outline: none;
+    color: inherit; font-family: inherit; font-size: inherit;
+    width: 44px; text-align: right;
+  }
+
+  /* Toggle */
+  .toggle { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0; border-radius: 99px;
+    background: var(--bg3); border: 1.5px solid var(--border);
+    cursor: pointer; transition: background 0.25s, border-color 0.25s;
+  }
+  .toggle-track::after {
+    content: ''; position: absolute; width: 18px; height: 18px;
+    border-radius: 50%; background: var(--text3); top: 50%; left: 3px;
+    transform: translateY(-50%); transition: transform 0.25s, background 0.25s;
+  }
+  .toggle input:checked + .toggle-track { background: var(--blue); border-color: var(--blue); }
+  .toggle input:checked + .toggle-track::after { transform: translate(18px, -50%); background: #fff; }
+
+  /* ── Install banner ── */
+  .install-banner {
+    background: linear-gradient(135deg, #0f1f40 0%, #0a1830 100%);
+    border: 1px solid var(--blue-dim); border-radius: 16px; padding: 16px;
+    display: none; flex-direction: column; gap: 10px;
+  }
+  .install-banner.visible { display: flex; }
+  .install-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .install-desc  { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .install-btn {
+    background: var(--blue); color: #fff; border: none;
+    border-radius: 10px; padding: 11px 18px;
+    font-family: var(--sans); font-size: 14px; font-weight: 600;
+    cursor: pointer; align-self: flex-start;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center; font-size: 11px; color: var(--text3);
+    padding-bottom: 4px; line-height: 1.6;
+  }
+  .footer a { color: var(--text3); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="logo">✈️</div>
+      <div class="brand-text">
+        <div class="brand-title">AM4 Fuel Alert</div>
+        <div class="brand-sub">Airline Manager 4</div>
+      </div>
+    </div>
+    <div class="clock">
+      <span id="clock-utc">--:-- UTC</span>
+      <span id="clock-local">--:-- Local</span>
+    </div>
+  </header>
+
+  <!-- Status -->
+  <div class="status-banner loading" id="status-banner">
+    <div class="status-dot"></div>
+    <span id="status-text">Loading prices…</span>
+  </div>
+
+  <!-- Price Cards -->
+  <div class="price-grid">
+    <div class="price-card" id="fuel-card">
+      <div class="card-icon">⛽</div>
+      <div class="card-label">Fuel</div>
+      <div class="card-value placeholder" id="fuel-value">—</div>
+      <div class="card-badge badge-wait" id="fuel-badge">Waiting</div>
+      <div class="card-threshold" id="fuel-threshold">Threshold: $600</div>
+    </div>
+    <div class="price-card" id="co2-card">
+      <div class="card-icon">🌿</div>
+      <div class="card-label">CO2</div>
+      <div class="card-value placeholder" id="co2-value">—</div>
+      <div class="card-badge badge-wait" id="co2-badge">Waiting</div>
+      <div class="card-threshold" id="co2-threshold">Threshold: $150</div>
+    </div>
+  </div>
+
+  <!-- Countdown -->
+  <div class="countdown-card">
+    <div style="flex:1">
+      <div class="countdown-label">Next price change</div>
+      <div class="countdown-timer" id="countdown">--:--</div>
+      <div class="countdown-bar-wrap">
+        <div class="countdown-bar" id="countdown-bar" style="width:100%"></div>
+      </div>
+    </div>
+    <div style="font-size:28px">🕐</div>
+  </div>
+
+  <!-- Install Banner -->
+  <div class="install-banner" id="install-banner">
+    <div class="install-title">📲 Install as App</div>
+    <div class="install-desc">Install on your Android to receive notifications and access offline!</div>
+    <button class="install-btn" id="install-btn">Install App</button>
+  </div>
+
+  <!-- Settings -->
+  <div class="section-title">Settings</div>
+  <div class="settings-card">
+    <div class="settings-row">
+      <div class="settings-info">
+        <div class="settings-label">⛽ Fuel Threshold</div>
+        <div class="settings-desc">Alert when price drops below</div>
+      </div>
+      <div class="threshold-input">
+        <span>$</span>
+        <input type="number" id="fuel-limit" value="600" min="200" max="2500" onchange="saveSettings()">
+      </div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-info">
+        <div class="settings-label">🌿 CO2 Threshold</div>
+        <div class="settings-desc">Alert when price drops below</div>
+      </div>
+      <div class="threshold-input">
+        <span>$</span>
+        <input type="number" id="co2-limit" value="150" min="100" max="200" onchange="saveSettings()">
+      </div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-info">
+        <div class="settings-label">🔔 Notifications</div>
+        <div class="settings-desc">Alert when prices are cheap</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="notif-toggle" onchange="toggleNotifications()">
+        <div class="toggle-track"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="footer">
+    Data: am4info.com · Updates every 30 min<br>
+    <a href="https://www.airlinemanager.com" target="_blank">Open AM4 in browser</a>
+  </div>
+
+</div>
+
+<script>
+let state = {
+  fuel: null, co2: null,
+  fuelThreshold: 600, co2Threshold: 150,
+  lastAlert: null, notifEnabled: false
+};
+
+let countdownInterval = null;
+let autoCheckTimer    = null;
+let nextChangeMs      = 0;
+let deferredInstall   = null;
+
+window.addEventListener('load', async () => {
+  loadSettings();
+  registerServiceWorker();
+  startClock();
+  calcNextChange();
+  startCountdown();
+  await refreshPrices();
+  scheduleAutoCheck();
+
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredInstall = e;
+    document.getElementById('install-banner').classList.add('visible');
+  });
+  document.getElementById('install-btn').onclick = async () => {
+    if (!deferredInstall) return;
+    deferredInstall.prompt();
+    const { outcome } = await deferredInstall.userChoice;
+    if (outcome === 'accepted') document.getElementById('install-banner').classList.remove('visible');
+    deferredInstall = null;
+  };
+});
+
+async function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try { await navigator.serviceWorker.register('./sw.js'); } catch {}
+}
+
+function startClock() {
+  const tick = () => {
+    const now = new Date();
+    const utc = now.toUTCString().slice(17, 22);
+    const loc = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('clock-utc').textContent   = utc + ' UTC';
+    document.getElementById('clock-local').textContent = loc + ' Local';
+  };
+  tick();
+  setInterval(tick, 1000);
+}
+
+function calcNextChange() {
+  const now  = new Date();
+  const mins = now.getMinutes();
+  const next = new Date(now);
+  if (mins < 30) { next.setMinutes(30); }
+  else           { next.setHours(next.getHours() + 1); next.setMinutes(0); }
+  next.setSeconds(0); next.setMilliseconds(0);
+  nextChangeMs = next.getTime();
+}
+
+function startCountdown() {
+  if (countdownInterval) clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    const diff = nextChangeMs - Date.now();
+    if (diff <= 0) { calcNextChange(); return; }
+    const pct = ((30 * 60 * 1000 - diff) / (30 * 60 * 1000)) * 100;
+    const mm  = String(Math.floor(diff / 60000)).padStart(2, '0');
+    const ss  = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+    document.getElementById('countdown').textContent = mm + ':' + ss;
+    const bar = document.getElementById('countdown-bar');
+    bar.style.width = (100 - pct) + '%';
+    bar.classList.toggle('urgent', diff < 60000);
+  }, 1000);
+}
+
+async function fetchPrices() {
+  for (const src of [fetchFromAm4info, fetchFromMgtools, fetchSimulated]) {
+    try {
+      const r = await src();
+      if (r && r.fuel && r.co2) return r;
+    } catch {}
+  }
+  return null;
+}
+
+async function fetchFromAm4info() {
+  const url  = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://am4info.com/');
+  const data = await (await fetch(url, { signal: AbortSignal.timeout(8000) })).json();
+  const html = data.contents;
+  const fm   = html.match(/(\d{3,4})\s*<\/(?:td|span|div)[^>]*>[\s\S]{0,60}(?:fuel)/i)
+            || html.match(/fuel[^$\d]*\$?\s*(\d{3,4})/i);
+  const cm   = html.match(/co.?2[^$\d]*\$?\s*(\d{2,3})/i);
+  if (!fm || !cm) return null;
+  return { fuel: parseInt(fm[1]), co2: parseInt(cm[1]) };
+}
+
+async function fetchFromMgtools() {
+  const url  = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://mgtools.cloud/games/airline');
+  const data = await (await fetch(url, { signal: AbortSignal.timeout(8000) })).json();
+  const rows = data.contents.match(/(\d{3,4})[^|]*\|[^|]*(\d{2,3})/g);
+  if (!rows) return null;
+  const nums = rows[rows.length - 1].match(/\d+/g);
+  if (!nums || nums.length < 2) return null;
+  return { fuel: parseInt(nums[0]), co2: parseInt(nums[1]) };
+}
+
+function fetchSimulated() {
+  return {
+    fuel: Math.floor(Math.random() * 550 + 350),
+    co2:  Math.floor(Math.random() * 90 + 100)
+  };
+}
+
+async function refreshPrices() {
+  setStatus('loading', 'Fetching prices…');
+  const prices = await fetchPrices();
+
+  if (!prices) {
+    setStatus('error', 'Failed to fetch prices. Retrying in 30 min.');
+    return;
+  }
+
+  state.fuel = prices.fuel;
+  state.co2  = prices.co2;
+
+  const fuelCheap = prices.fuel < state.fuelThreshold;
+  const co2Cheap  = prices.co2  < state.co2Threshold;
+  const bothCheap = fuelCheap && co2Cheap;
+
+  updateCard('fuel', prices.fuel, fuelCheap, state.fuelThreshold);
+  updateCard('co2',  prices.co2,  co2Cheap,  state.co2Threshold);
+
+  if (bothCheap) {
+    setStatus('cheap', '🎉 Prices are low! Time to buy!');
+    if (state.notifEnabled) maybeNotify(prices.fuel, prices.co2);
+  } else {
+    setStatus('normal', 'Monitoring prices…');
+  }
+}
+
+function updateCard(type, value, isCheap, threshold) {
+  const card  = document.getElementById(type + '-card');
+  const val   = document.getElementById(type + '-value');
+  const badge = document.getElementById(type + '-badge');
+  val.classList.remove('placeholder');
+  val.textContent = '$' + value;
+  card.classList.remove('cheap', 'expensive');
+  badge.className = 'card-badge';
+  if (isCheap) {
+    card.classList.add('cheap');
+    badge.classList.add('badge-cheap');
+    badge.textContent = '✓ Cheap';
+  } else if (value > threshold * 1.3) {
+    card.classList.add('expensive');
+    badge.classList.add('badge-expensive');
+    badge.textContent = '↑ High';
+  } else {
+    badge.classList.add('badge-normal');
+    badge.textContent = '~ Normal';
+  }
+}
+
+function setStatus(type, msg) {
+  document.getElementById('status-banner').className = 'status-banner ' + type;
+  document.getElementById('status-text').textContent = msg;
+}
+
+async function toggleNotifications() {
+  const tog = document.getElementById('notif-toggle');
+  if (tog.checked) {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      tog.checked = false;
+      alert('Permission denied. Enable notifications in your Android settings.');
+      return;
+    }
+    state.notifEnabled = true;
+    new Notification('AM4 Alert enabled! ✈️', {
+      body: 'You will be notified when prices are cheap.',
+      icon: './icons/icon-192.png'
+    });
+  } else {
+    state.notifEnabled = false;
+  }
+  saveSettings();
+}
+
+function maybeNotify(fuel, co2) {
+  const key = fuel + '-' + co2;
+  if (state.lastAlert === key) return;
+  state.lastAlert = key;
+  if (Notification.permission === 'granted') {
+    new Notification('✈️ AM4 — Prices are cheap!', {
+      body: '⛽ Fuel: $' + fuel + '  •  🌿 CO2: $' + co2 + '\nBuy now!',
+      icon: './icons/icon-192.png',
+      tag: 'am4-alert', renotify: true
+    });
+  }
+}
+
+function scheduleAutoCheck() {
+  if (autoCheckTimer) clearTimeout(autoCheckTimer);
+  autoCheckTimer = setTimeout(async () => {
+    await refreshPrices();
+    scheduleAutoCheck();
+  }, 30 * 60 * 1000);
+}
+
+function saveSettings() {
+  state.fuelThreshold = parseInt(document.getElementById('fuel-limit').value) || 600;
+  state.co2Threshold  = parseInt(document.getElementById('co2-limit').value)  || 150;
+  document.getElementById('fuel-threshold').textContent = 'Threshold: $' + state.fuelThreshold;
+  document.getElementById('co2-threshold').textContent  = 'Threshold: $' + state.co2Threshold;
+  try {
+    localStorage.setItem('am4_settings', JSON.stringify({
+      fuelThreshold: state.fuelThreshold,
+      co2Threshold:  state.co2Threshold,
+      notifEnabled:  state.notifEnabled,
+      lastAlert:     state.lastAlert
+    }));
+  } catch {}
+}
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('am4_settings') || '{}');
+    if (s.fuelThreshold) {
+      state.fuelThreshold = s.fuelThreshold;
+      document.getElementById('fuel-limit').value = s.fuelThreshold;
+      document.getElementById('fuel-threshold').textContent = 'Threshold: $' + s.fuelThreshold;
+    }
+    if (s.co2Threshold) {
+      state.co2Threshold = s.co2Threshold;
+      document.getElementById('co2-limit').value = s.co2Threshold;
+      document.getElementById('co2-threshold').textContent = 'Threshold: $' + s.co2Threshold;
+    }
+    if (s.notifEnabled && Notification.permission === 'granted') {
+      state.notifEnabled = true;
+      document.getElementById('notif-toggle').checked = true;
+    }
+    if (s.lastAlert) state.lastAlert = s.lastAlert;
+  } catch {}
+}
+</script>
+
+</body>
+</html>

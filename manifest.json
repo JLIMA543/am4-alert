@@ -1,0 +1,26 @@
+{
+  "name": "AM4 Fuel Alert",
+  "short_name": "AM4 Alert",
+  "description": "Monitoramento de preços de Combustível e CO2 no Airline Manager 4",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0e1a",
+  "theme_color": "#0a0e1a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["utilities", "games"]
+}
